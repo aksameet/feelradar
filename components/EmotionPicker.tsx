@@ -1,3 +1,4 @@
+// components/EmotionPicker.tsx
 import { View, Pressable, Text, StyleSheet } from 'react-native';
 
 const emotions = [
@@ -9,15 +10,11 @@ const emotions = [
   { label: 'Zaskoczony', icon: '😮' },
 ];
 
-export default function EmotionPicker() {
-  const handleSelect = (emotion: string) => {
-    console.log(`Selected emotion: ${emotion}`);
-  };
-
+export default function EmotionPicker({ onSelect }: { onSelect: (emotion: string) => void }) {
   return (
     <View style={styles.wrapper}>
       {emotions.map((e) => (
-        <Pressable key={e.label} style={styles.emoji} onPress={() => handleSelect(e.label)}>
+        <Pressable key={e.label} style={styles.emoji} onPress={() => onSelect(e.label)}>
           <Text style={{ fontSize: 32 }}>{e.icon}</Text>
           <Text style={styles.label}>{e.label}</Text>
         </Pressable>
@@ -32,6 +29,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 12,
+    paddingVertical: 16,
   },
   emoji: {
     alignItems: 'center',
