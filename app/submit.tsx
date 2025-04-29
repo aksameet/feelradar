@@ -1,13 +1,16 @@
-import { View, Text, StyleSheet, Dimensions, Alert } from 'react-native';
-import MapView, { Marker, MapPressEvent } from 'react-native-maps';
-import { useState } from 'react';
-import EmotionPicker from '../components/EmotionPicker';
-import { saveMood } from '../services/storage';
-import { ThemedText } from '@/components/ThemedText';
+import { View, Text, StyleSheet, Dimensions, Alert } from "react-native";
+import MapView, { Marker, MapPressEvent } from "react-native-maps";
+import { useState } from "react";
+import EmotionPicker from "../components/EmotionPicker";
+import { saveMood } from "../services/storage";
+import { ThemedText } from "@/components/ThemedText";
 
 export default function SubmitScreen() {
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   const handleMapPress = (event: MapPressEvent) => {
     const coords = event.nativeEvent.coordinate;
@@ -20,14 +23,29 @@ export default function SubmitScreen() {
         longitude: coords.longitude,
         timestamp: new Date().toISOString(),
       };
-      saveMood(newEntry)
+
+      // lokalny zapis (na później)
+      saveMood(newEntry);
+
+      // wysyłka do backendu
+      fetch("https://feelradar-api.up.railway.app/moods", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newEntry),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Błąd wysyłki");
+          return res.json();
+        })
         .then(() => {
-          Alert.alert('Zapisano!', 'Nastrój został zapisany lokalnie.');
+          Alert.alert("Zapisano!", "Nastrój został wysłany na serwer.");
           setSelectedEmotion(null);
           setSelectedLocation(null);
         })
         .catch((err) => {
-          Alert.alert('Błąd', 'Nie udało się zapisać nastroju.');
+          Alert.alert("Błąd", "Nie udało się wysłać nastroju.");
           console.error(err);
         });
     }
@@ -49,14 +67,19 @@ export default function SubmitScreen() {
           longitude: 21.0122,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
-        }}>
-        {selectedLocation && <Marker coordinate={selectedLocation} title="Wybrana lokalizacja" />}
+        }}
+      >
+        {selectedLocation && (
+          <Marker coordinate={selectedLocation} title="Wybrana lokalizacja" />
+        )}
       </MapView>
 
       <EmotionPicker onSelect={handleEmotionSelect} />
 
       {selectedEmotion && (
-        <ThemedText style={styles.confirmText}>Kliknij na mapie, aby przypisać: {selectedEmotion}</ThemedText>
+        <ThemedText style={styles.confirmText}>
+          Kliknij na mapie, aby przypisać: {selectedEmotion}
+        </ThemedText>
       )}
     </View>
   );
@@ -68,18 +91,18 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
     marginTop: 16,
     marginBottom: 8,
-    color: '#FFF',
+    color: "#FFF",
   },
   map: {
-    width: Dimensions.get('window').width,
+    width: Dimensions.get("window").width,
     height: 250,
   },
   confirmText: {
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 12,
     fontSize: 16,
   },
