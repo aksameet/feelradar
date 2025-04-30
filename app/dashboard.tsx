@@ -1,74 +1,88 @@
-// app/dashboard.tsx
-import { StyleSheet, Dimensions, Alert, Pressable } from "react-native";
-import MapView, { Marker } from "react-native-maps";
 import { useEffect, useState } from "react";
-import { getAllMoods, MoodEntry, clearMoods } from "../services/storage";
+import { Alert, Dimensions, StyleSheet, ActivityIndicator } from "react-native";
+import MapView from "react-native-maps";
+import { Marker, Region } from "react-native-maps";
+import * as Location from "expo-location";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { EmojiMarker } from "@/components/EmojiMarker";
 
+type MoodEntry = {
+  id: number;
+  emotion: string;
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+};
+
 export default function DashboardScreen() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
+  const [initialRegion, setInitialRegion] = useState<Region | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAllMoods().then(setMoods);
+    // lokalizacja
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Brak dostępu do lokalizacji");
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const region = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.2,
+        longitudeDelta: 0.2,
+      };
+      setInitialRegion(region);
+    })();
   }, []);
 
-  const handleClear = () => {
-    Alert.alert(
-      "Czy na pewno?",
-      "Wszystkie zapisane nastroje zostaną usunięte.",
-      [
-        { text: "Anuluj", style: "cancel" },
-        {
-          text: "Wyczyść",
-          style: "destructive",
-          onPress: async () => {
-            await clearMoods();
-            const updated = await getAllMoods();
-            setMoods(updated);
-          },
-        },
-      ]
-    );
-  };
+  useEffect(() => {
+    // dane z backendu
+    fetch("https://feelradar-backend-production.up.railway.app/moods")
+      .then((res) => {
+        if (!res.ok) throw new Error("Błąd API");
+        return res.json();
+      })
+      .then(setMoods)
+      .catch((err) => {
+        console.error(err);
+        Alert.alert("Błąd", "Nie udało się pobrać nastrojów z serwera.");
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText style={styles.title}>Twoje zapisane nastroje</ThemedText>
-      <Pressable
-        onPress={handleClear}
-        style={{
-          backgroundColor: "#d32f2f",
-          padding: 6,
-          borderRadius: 8,
-          marginHorizontal: 20,
-          marginBottom: 12,
-        }}
-      >
-        <ThemedText style={{ textAlign: "center" }}>
-          🗑️ Wyczyść wszystkie nastroje
-        </ThemedText>
-      </Pressable>
-      <MapView
-        style={styles.map}
-        initialRegion={{
-          latitude: 52.2297,
-          longitude: 21.0122,
-          latitudeDelta: 0.2,
-          longitudeDelta: 0.2,
-        }}
-      >
-        {moods.map((mood, index) => (
-          <EmojiMarker
-            key={index}
-            latitude={mood.latitude}
-            longitude={mood.longitude}
-            emoji={findEmoji(mood.emotion)}
-            label={mood.emotion}
+      <ThemedText style={styles.title}>Zgłoszone nastroje</ThemedText>
+
+      {initialRegion && !loading ? (
+        <MapView style={styles.map} initialRegion={initialRegion}>
+          {/* Można dodać marker "Tu jesteś" */}
+          <Marker
+            coordinate={{
+              latitude: initialRegion.latitude,
+              longitude: initialRegion.longitude,
+            }}
+            title="Tu jesteś"
           />
-        ))}
-      </MapView>
+
+          {moods.map((mood) => (
+            <EmojiMarker
+              key={mood.id}
+              latitude={mood.latitude}
+              longitude={mood.longitude}
+              emoji={findEmoji(mood.emotion)}
+              label={mood.emotion}
+            />
+          ))}
+        </MapView>
+      ) : (
+        <ActivityIndicator size="large" style={{ marginTop: 32 }} />
+      )}
     </ThemedView>
   );
 }

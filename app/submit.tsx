@@ -1,9 +1,18 @@
-import { View, Text, StyleSheet, Dimensions, Alert } from "react-native";
-import MapView, { Marker, MapPressEvent } from "react-native-maps";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  Dimensions,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import MapView, { Marker, MapPressEvent, Region } from "react-native-maps";
+import * as Location from "expo-location";
 import EmotionPicker from "../components/EmotionPicker";
 import { saveMood } from "../services/storage";
 import { ThemedText } from "@/components/ThemedText";
+import { API_BASE_URL } from "@/constants/api";
+import Toast from "react-native-root-toast";
 
 export default function SubmitScreen() {
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
@@ -11,6 +20,25 @@ export default function SubmitScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [initialRegion, setInitialRegion] = useState<Region | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Brak dostępu do lokalizacji");
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      setInitialRegion({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+    })();
+  }, []);
 
   const handleMapPress = (event: MapPressEvent) => {
     const coords = event.nativeEvent.coordinate;
@@ -24,11 +52,9 @@ export default function SubmitScreen() {
         timestamp: new Date().toISOString(),
       };
 
-      // lokalny zapis (na później)
       saveMood(newEntry);
 
-      // wysyłka do backendu
-      fetch("https://feelradar-api.up.railway.app/moods", {
+      fetch(`${API_BASE_URL}/moods`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -57,22 +83,23 @@ export default function SubmitScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Wybierz nastrój a nastepnie lokalizację</Text>
+      <ThemedText style={styles.title}>
+        Wybierz nastrój, a następnie kliknij na mapie
+      </ThemedText>
 
-      <MapView
-        style={styles.map}
-        onPress={handleMapPress}
-        initialRegion={{
-          latitude: 52.2297,
-          longitude: 21.0122,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
-      >
-        {selectedLocation && (
-          <Marker coordinate={selectedLocation} title="Wybrana lokalizacja" />
-        )}
-      </MapView>
+      {initialRegion ? (
+        <MapView
+          style={styles.map}
+          onPress={handleMapPress}
+          initialRegion={initialRegion}
+        >
+          {selectedLocation && (
+            <Marker coordinate={selectedLocation} title="Wybrana lokalizacja" />
+          )}
+        </MapView>
+      ) : (
+        <ActivityIndicator size="large" style={{ marginTop: 32 }} />
+      )}
 
       <EmotionPicker onSelect={handleEmotionSelect} />
 
@@ -95,7 +122,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 16,
     marginBottom: 8,
-    color: "#FFF",
   },
   map: {
     width: Dimensions.get("window").width,
