@@ -66,7 +66,14 @@ export default function SubmitScreen() {
           return res.json();
         })
         .then(() => {
-          Alert.alert("Zapisano!", "Nastrój został wysłany na serwer.");
+          Toast.show("✅ Nastrój zapisany!", {
+            duration: Toast.durations.SHORT,
+            position: Toast.positions.BOTTOM,
+            shadow: true,
+            animation: true,
+            hideOnPress: true,
+            delay: 0,
+          });
           setSelectedEmotion(null);
           setSelectedLocation(null);
         })
